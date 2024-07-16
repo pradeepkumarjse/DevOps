@@ -1,0 +1,22 @@
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Sid": "AllowAccessToSpecificBucketFromSpecificIP",
+            "Effect": "Allow",
+            "Action": "s3:*",
+            "Resource": [
+                "arn:aws:s3:::bucket2-al",
+                "arn:aws:s3:::bucket2-al/*"
+            ],
+            "Condition": {
+                "IpAddress": {
+                    "aws:SourceIp": [
+                        "152.59.14.214/32",
+                        "198.251.6.104/32"
+                    ]
+                }
+            }
+        }
+    ]
+}
