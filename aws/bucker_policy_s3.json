@@ -1,0 +1,23 @@
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Sid": "AllowAccessFromSpecificIP",
+            "Effect": "Deny",
+            "Principal": "*",
+            "Action": "s3:*",
+            "Resource": [
+                "arn:aws:s3:::bucket1-al",
+                "arn:aws:s3:::bucket1-al/*"
+            ],
+            "Condition": {
+                "NotIpAddress": {
+                    "aws:SourceIp": [
+                        "152.59.143.215/24",
+                        "198.251.69.104/32"
+                    ]
+                }
+            }
+        }
+    ]
+}
