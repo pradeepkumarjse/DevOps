@@ -1,6 +1,7 @@
 import boto3
 import json
 import requests
+from botocore.exceptions import ClientError
 
 # Source and target regions
 source_region = 'us-east-1'
@@ -53,6 +54,35 @@ def create_lambda_function(lambda_client, function_details):
         TracingConfig=config.get('TracingConfig', {})
     )
 
+def copy_resource_policy(api_client_source, api_client_target, source_api_id, target_api_id):
+    try:
+        # Retrieve the current policy from the source API
+        policy_response = api_client_source.get_rest_api(restApiId=source_api_id)
+        policy = policy_response.get('policy')
+
+        if policy:
+            policy = policy.replace('\\"', '"')
+            # Convert policy string to JSON
+            policy_json = json.loads(policy)
+            # Use update_rest_api to apply the policy to the target API
+            response = api_client_target.update_rest_api(
+                restApiId=target_api_id,
+                patchOperations=[
+                    {
+                        'op': 'replace',
+                        'path': '/policy',
+                        'value': json.dumps(policy_json)
+                    }
+                ]
+            )
+            print(f"Policy applied to target API. Response: {response}")
+        else:
+            print(f"No policy found for API {source_api_id}.")
+    except json.JSONDecodeError as e:
+        print(f"JSON decoding error: {str(e)}")
+    except Exception as e:
+        print(f"Error copying resource policy: {str(e)}")
+
 def get_api_triggers(lambda_client, function_name):
     try:
         policy = json.loads(lambda_client.get_policy(FunctionName=function_name)['Policy'])
@@ -73,10 +103,13 @@ def copy_api(api_client_source, api_client_target, source_api_id, target_lambda_
     if not source_resources:
         print(f"No resources found for API ID {source_api_id}")
         return None
-
-    target_api = api_client_target.create_rest_api(name=f"Copied-{source_api_id}")
+    source_api = api_client_source.get_rest_api(restApiId=source_api_id)
+    source_api_name = source_api.get('name', f"API-{source_api_id}")
+    target_api = api_client_target.create_rest_api(name=source_api_name)
     target_api_id = target_api['id']
     target_resources = get_resource_map(api_client_target, target_api_id)
+
+    print(target_resources)
 
     def get_root_resource(resources):
         for res_id, res in resources.items():
@@ -86,7 +119,17 @@ def copy_api(api_client_source, api_client_target, source_api_id, target_lambda_
 
     root_resource_id = get_root_resource(target_resources)
 
-    def create_method(api_client, api_id, resource_id, method, integration_uri):
+    def create_method(api_client, api_id, resource_id, method, integration_uri):       
+        try:
+            integration = api_client_source.get_integration(
+                restApiId=source_api_id,
+                resourceId=source_resources[src_res_id]['id'],
+                httpMethod=method
+            )
+        except api_client_source.exceptions.NotFoundException:
+            print(f"No integration found for method {method} on resource {source_resources[src_res_id]}")
+            return
+
         api_client.put_method(
             restApiId=api_id,
             resourceId=resource_id,
@@ -97,9 +140,16 @@ def copy_api(api_client_source, api_client_target, source_api_id, target_lambda_
             restApiId=api_id,
             resourceId=resource_id,
             httpMethod=method,
-            type='AWS_PROXY',
+            type=integration['type'],
             integrationHttpMethod='POST',
-            uri=integration_uri
+            uri=integration_uri,
+            requestParameters= integration.get('requestParameters', {}),
+            requestTemplates =integration.get('requestTemplates', {}),
+            passthroughBehavior = integration.get('passthroughBehavior'),
+            cacheNamespace= integration.get('cacheNamespace'),
+            cacheKeyParameters=integration.get('cacheKeyParameters', []),
+            timeoutInMillis= integration.get('timeoutInMillis', 29000),
+            contentHandling= integration.get('contentHandling', 'CONVERT_TO_BINARY')
         )
 
     def copy_resource(api_client_target, target_api_id, target_resources, source_resources, src_res_id):
@@ -140,26 +190,45 @@ def copy_api(api_client_source, api_client_target, source_api_id, target_lambda_
 
     return target_api_id
 
+def check_function_exists(lambda_client, function_name):
+    try:
+        lambda_client.get_function(FunctionName=function_name)
+        return True
+    except ClientError as e:
+        if e.response['Error']['Code'] == 'ResourceNotFoundException':
+            return False
+        else:
+            raise e
+
 def lambda_handler(event, context):
     functions = list_lambda_functions(lambda_client_source)
     for function in functions:
         function_name = function['FunctionName']
         function_details = get_lambda_function(lambda_client_source, function_name)
-        create_lambda_function(lambda_client_target, function_details)
-        api_triggers = get_api_triggers(lambda_client_source, function_name)
-        target_lambda_arn = f"arn:aws:lambda:{target_region}:{account_id}:function:{function_name}"
-        for trigger in api_triggers:
-            source_arn = trigger['Condition']['ArnLike']['AWS:SourceArn']
-            source_api_id = source_arn.split(':')[5].split('/')[0]
-            target_api_id = copy_api(api_client_source, api_client_target, source_api_id, target_lambda_arn)
-            if target_api_id:
-                lambda_client_target.add_permission(
-                    FunctionName=function_name,
-                    StatementId=f"{function_name}-permission",
-                    Action='lambda:InvokeFunction',
-                    Principal='apigateway.amazonaws.com',
-                    SourceArn=f"arn:aws:execute-api:{target_region}:{account_id}:{target_api_id}//"
-                )
+        # Check if function already exists in the target account
+        if not check_function_exists(lambda_client_target, function_name):
+            create_lambda_function(lambda_client_target, function_details)
+
+            api_triggers = get_api_triggers(lambda_client_source, function_name)
+            target_lambda_arn = f"arn:aws:lambda:{target_region}:{account_id}:function:{function_name}"
+            for trigger in api_triggers:
+                try:
+                    source_arn = trigger['Condition']['ArnLike']['AWS:SourceArn']
+                    source_api_id = source_arn.split(':')[5].split('/')[0]
+                    target_api_id = copy_api(api_client_source, api_client_target, source_api_id, target_lambda_arn)
+                    copy_resource_policy(api_client_source, api_client_target, source_api_id, target_api_id)
+                    if target_api_id:
+                        lambda_client_target.add_permission(
+                            FunctionName=function_name,
+                            StatementId=f"{function_name}-permission",
+                            Action='lambda:InvokeFunction',
+                            Principal='apigateway.amazonaws.com',
+                            SourceArn=f"arn:aws:execute-api:{target_region}:{account_id}:{target_api_id}//"
+                        )
+                except Exception as e:
+                    print(f"Failed to create trigger {trigger}")
+        else:
+            print(f"Function {function_name} already exists in target account. Skipping...")
     return {
         'statusCode': 200,
         'body': json.dumps('Lambda functions and triggers copied successfully')
