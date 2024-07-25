@@ -86,71 +86,21 @@ def copy_api(api_client_source, api_client_target, source_api_id, target_lambda_
 
     root_resource_id = get_root_resource(target_resources)
 
-    def create_method(api_client, api_id, source_resource_id, target_resource_id, method, integration_uri, source_method):
+    def create_method(api_client, api_id, resource_id, method, integration_uri):
         api_client.put_method(
             restApiId=api_id,
-            resourceId=target_resource_id,
+            resourceId=resource_id,
             httpMethod=method,
-            authorizationType=source_method.get('authorizationType', 'NONE'),
-            apiKeyRequired=source_method.get('apiKeyRequired', False)
+            authorizationType='NONE'
         )
-
-        try:
-            integration = api_client_source.get_integration(
-                restApiId=source_api_id,
-                resourceId=source_resource_id,
-                httpMethod=method
-            )
-        except api_client_source.exceptions.NotFoundException:
-            print(f"No integration found for method {method} on resource {source_resource_id}")
-            return
-
-        integration_params = {
-            'restApiId': api_id,
-            'resourceId': target_resource_id,
-            'httpMethod': method,
-            'type': integration['type'],
-            'integrationHttpMethod': integration.get('httpMethod', 'POST'),
-            'uri': integration_uri if integration['type'] == 'AWS_PROXY' else integration.get('uri', ''),
-            'requestParameters': integration.get('requestParameters', {}),
-            'requestTemplates': integration.get('requestTemplates', {}),
-            'passthroughBehavior': integration.get('passthroughBehavior'),
-            'cacheNamespace': integration.get('cacheNamespace'),
-            'cacheKeyParameters': integration.get('cacheKeyParameters', []),
-            'timeoutInMillis': integration.get('timeoutInMillis', 29000),
-            'contentHandling': integration.get('contentHandling', 'CONVERT_TO_BINARY'),
-        }
-
-        if integration.get('credentials'):
-            integration_params['credentials'] = integration['credentials']
-
-        api_client.put_integration(**integration_params)
-
-        # Copy method responses
-        if 'methodResponses' in source_method:
-            for status_code, response in source_method['methodResponses'].items():
-                api_client.put_method_response(
-                    restApiId=api_id,
-                    resourceId=target_resource_id,
-                    httpMethod=method,
-                    statusCode=status_code,
-                    responseParameters=response.get('responseParameters', {}),
-                    responseModels=response.get('responseModels', {})
-                )
-
-        # Copy integration responses
-        if 'integrationResponses' in integration:
-            for status_code, response in integration['integrationResponses'].items():
-                response_templates = {k: v for k, v in response.get('responseTemplates', {}).items() if v is not None}
-                api_client.put_integration_response(
-                    restApiId=api_id,
-                    resourceId=target_resource_id,
-                    httpMethod=method,
-                    statusCode=status_code,
-                    selectionPattern=response.get('selectionPattern', ''),
-                    responseParameters=response.get('responseParameters', {}),
-                    responseTemplates=response_templates
-                )
+        api_client.put_integration(
+            restApiId=api_id,
+            resourceId=resource_id,
+            httpMethod=method,
+            type='AWS_PROXY',
+            integrationHttpMethod='POST',
+            uri=integration_uri
+        )
 
     def copy_resource(api_client_target, target_api_id, target_resources, source_resources, src_res_id):
         src_res = source_resources[src_res_id]
@@ -180,10 +130,10 @@ def copy_api(api_client_source, api_client_target, source_api_id, target_lambda_
             copy_resource(api_client_target, target_api_id, target_resources, source_resources, src_res_id)
 
     for src_res_id, src_res in source_resources.items():
-        for method, source_method in src_res.get('resourceMethods', {}).items():
+        for method in src_res.get('resourceMethods', {}):
             if src_res_id in target_resources:
                 integration_uri = f"arn:aws:apigateway:{target_region}:lambda:path/2015-03-31/functions/{target_lambda_arn}/invocations"
-                create_method(api_client_target, target_api_id, src_res_id, target_resources[src_res_id]['id'], method, integration_uri, source_method)
+                create_method(api_client_target, target_api_id, target_resources[src_res_id]['id'], method, integration_uri)
                 print(f"Created method {method} for resource {src_res_id} in target API.")
             else:
                 print(f"Resource {src_res_id} not found in target API for method {method}.")
@@ -205,15 +155,15 @@ def lambda_handler(event, context):
             if target_api_id:
                 lambda_client_target.add_permission(
                     FunctionName=function_name,
-                    StatementId=f"{function_name}-apigateway",
-                    Action="lambda:InvokeFunction",
-                    Principal="apigateway.amazonaws.com",
-                    SourceArn=f"arn:aws:apigateway:{target_region}::/restapis/{target_api_id}/*/*"
+                    StatementId=f"{function_name}-permission",
+                    Action='lambda:InvokeFunction',
+                    Principal='apigateway.amazonaws.com',
+                    SourceArn=f"arn:aws:execute-api:{target_region}:{account_id}:{target_api_id}//"
                 )
-
     return {
         'statusCode': 200,
-        'body': json.dumps('Lambda functions and API Gateway configurations copied successfully')
+        'body': json.dumps('Lambda functions and triggers copied successfully')
     }
+
 
 lambda_handler(None, None)
