@@ -1,1 +1,1 @@
-
+aws apigateway get-rest-apis --query 'items[*].id' --output text | tr '\t' '\n' | xargs -I {} bash -c 'aws apigateway delete-rest-api --rest-api-id {}; sleep 22'
