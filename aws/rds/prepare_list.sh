@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Define column headers
-echo "AWS Account ID,AWS Region,DB Identifier,Cluster Name,Role,Status,Engine,Size,CPUs,RAM,Allocated Storage,Endpoint,Availability Zone,Is Disk Encrypted,KMS Key ID,Security Group Name,Open Ports" > rds_instances.csv
+echo "AWS Account ID,AWS Region,DB Identifier,Cluster Name,Role,Status,Engine,Size,CPUs,RAM,Allocated Storage,Endpoint,Availability Zone,Is Disk Encrypted,KMS Key ID,Is Automated Backup Enabled,Security Group Names,Open Ports" > rds_instances.csv
 
 # Get the AWS account ID
 account_id=$(aws sts get-caller-identity --query 'Account' --output text)
@@ -14,7 +14,7 @@ for region in $regions; do
     echo "Fetching RDS instances in $region"
     
     # Describe RDS instances in the region
-    instances=$(aws rds describe-db-instances --region $region --query 'DBInstances[*].[DBInstanceIdentifier,DBInstanceClass,Engine,AllocatedStorage,Endpoint.Address,DBSecurityGroups[*].DBSecurityGroupName,VpcSecurityGroups[*].VpcSecurityGroupId,DBInstanceStatus,AvailabilityZone,StorageEncrypted,KmsKeyId,DBInstanceArn]' --output json)
+    instances=$(aws rds describe-db-instances --region $region --query 'DBInstances[*].[DBInstanceIdentifier,DBInstanceClass,Engine,AllocatedStorage,Endpoint.Address,DBSecurityGroups[*].DBSecurityGroupName,VpcSecurityGroups[*].VpcSecurityGroupId,DBInstanceStatus,AvailabilityZone,StorageEncrypted,KmsKeyId,DBInstanceArn,BackupRetentionPeriod]' --output json)
     
     # Loop through each instance to get additional details
     echo "$instances" | jq -c '.[]' | while read instance; do
@@ -30,6 +30,7 @@ for region in $regions; do
         storage_encrypted=$(echo $instance | jq -r '.[9]')
         kms_key_arn=$(echo $instance | jq -r '.[10]')
         db_instance_arn=$(echo $instance | jq -r '.[11]')
+        backup_retention_period=$(echo $instance | jq -r '.[12]')
         
         # Convert storage_encrypted to Yes or No
         if [ "$storage_encrypted" = "true" ]; then
@@ -40,6 +41,13 @@ for region in $regions; do
         
         # Extract KMS Key ID from ARN
         kms_key_id=$(echo $kms_key_arn | awk -F'/' '{print $NF}')
+        
+        # Determine if automated backups are enabled
+        if [ "$backup_retention_period" -gt 0 ]; then
+            is_automated_backup_enabled="Yes"
+        else
+            is_automated_backup_enabled="No"
+        fi
         
         # Get the cluster identifier if the instance is part of a cluster
         cluster_identifier=$(aws rds describe-db-clusters --region $region --query "DBClusters[?contains(DBClusterMembers[?DBInstanceIdentifier=='$db_identifier'].DBInstanceIdentifier, '$db_identifier')].[DBClusterIdentifier]" --output text)
@@ -60,24 +68,23 @@ for region in $regions; do
         security_group_names=""
         open_ports=""
         
-        if [ -n "$db_security_groups" ]; then
-            for sg in $db_security_groups; do
-                security_group_name=$(aws ec2 describe-security-groups --group-ids $sg --query 'SecurityGroups[*].GroupName' --output text --region $region)
-                security_group_names+="$security_group_name "
-                open_ports+=$(aws ec2 describe-security-groups --group-ids $sg --query 'SecurityGroups[*].IpPermissions[*].FromPort' --output text --region $region)" "
-            done
-        fi
+        all_security_groups=$(echo "$db_security_groups $vpc_security_groups")
         
-        if [ -n "$vpc_security_groups" ]; then
-            for sg in $vpc_security_groups; do
+        for sg in $all_security_groups; do
+            if [ -n "$sg" ]; then
                 security_group_name=$(aws ec2 describe-security-groups --group-ids $sg --query 'SecurityGroups[*].GroupName' --output text --region $region)
                 security_group_names+="$security_group_name "
-                open_ports+=$(aws ec2 describe-security-groups --group-ids $sg --query 'SecurityGroups[*].IpPermissions[*].FromPort' --output text --region $region)" "
-            done
-        fi
+                
+                ports=$(aws ec2 describe-security-groups --group-ids $sg --query 'SecurityGroups[*].IpPermissions[*].FromPort' --output json --region $region | jq -r '.[][]')
+                open_ports+="$ports "
+            fi
+        done
 
+        # Remove duplicates and sort the open ports
+        open_ports=$(echo $open_ports | tr ' ' '\n' | sort -n | uniq | tr '\n' ' ')
+        
         # Append the instance details to the CSV file
-        echo "$account_id,$region,$db_identifier,$cluster_identifier,$role,$status,$engine,$size,$cpus,$ram,$allocated_storage,$endpoint,$availability_zone,$storage_encrypted,$kms_key_id,$security_group_names,$open_ports" >> rds_instances.csv
+        echo "$account_id,$region,$db_identifier,$cluster_identifier,$role,$status,$engine,$size,$cpus,$ram,$allocated_storage,$endpoint,$availability_zone,$storage_encrypted,$kms_key_id,$is_automated_backup_enabled,\"$security_group_names\",\"$open_ports\"" >> rds_instances.csv
     done
 done
 
