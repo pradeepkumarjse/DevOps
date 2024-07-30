@@ -1,0 +1,46 @@
+
+1. Install NFS on instance 1
+
+
+sudo apt-get update
+sudo apt-get install nfs-kernel-server nfs-common
+
+
+2. Configure NFS on the Server (Instance1)
+
+sudo mkdir -p /path/to/shared_folder
+sudo chmod 755 /path/to/shared_folder
+
+3. Edit the Exports File:
+sudo nano /etc/exports
+
+add line 
+
+/path/to/shared_folder instance2(rw,sync,no_subtree_check)
+
+
+Apply the Changes:
+
+sudo exportfs -a
+sudo systemctl restart nfs-kernel-server
+
+
+
+3. Configure NFS on the Client (Instance2)
+
+sudo apt-get update
+sudo apt-get install nfs-common
+
+Create a Mount Point:
+sudo mkdir -p /path/to/mountpoint
+
+Mount the NFS Share:
+sudo mount instance1:/path/to/shared_folder /path/to/mountpoint
+
+
+
+4. Make the Mount Permanent (Optional)
+
+add below in /etc/fstab
+
+instance1:/home/ubuntu/sharefolder /home/ubuntu/sharefolder nfs defaults 0 0
