@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Define column headers
-echo "AWS Account ID,AWS Region,DB Identifier,Cluster Name,Role,Status,Engine,Size,CPUs,RAM,Allocated Storage,Endpoint,Availability Zone,Is Disk Encrypted,KMS Key ID,Is Automated Backup Enabled,Security Group Names,Open Ports" > rds_instances.csv
+echo "AWS Account ID,AWS Region,DB Identifier,Cluster Name,Role,Status,Engine,Engine Version,Size,CPUs,RAM,Allocated Storage,Endpoint,Reader Endpoint,Writer Endpoint,Availability Zone,Is Disk Encrypted,KMS Key ID,Is Automated Backup Enabled,Security Group Names,Open Ports" > rds_instances.csv
 
 # Get the AWS account ID
 account_id=$(aws sts get-caller-identity --query 'Account' --output text)
@@ -14,23 +14,29 @@ for region in $regions; do
     echo "Fetching RDS instances in $region"
     
     # Describe RDS instances in the region
-    instances=$(aws rds describe-db-instances --region $region --query 'DBInstances[*].[DBInstanceIdentifier,DBInstanceClass,Engine,AllocatedStorage,Endpoint.Address,DBSecurityGroups[*].DBSecurityGroupName,VpcSecurityGroups[*].VpcSecurityGroupId,DBInstanceStatus,AvailabilityZone,StorageEncrypted,KmsKeyId,DBInstanceArn,BackupRetentionPeriod]' --output json)
+    instances=$(aws rds describe-db-instances --region $region --query 'DBInstances[*].[DBInstanceIdentifier,DBInstanceClass,Engine,EngineVersion,AllocatedStorage,Endpoint.Address,DBSecurityGroups[*].DBSecurityGroupName,VpcSecurityGroups[*].VpcSecurityGroupId,DBInstanceStatus,AvailabilityZone,StorageEncrypted,KmsKeyId,DBInstanceArn,BackupRetentionPeriod]' --output json)
     
     # Loop through each instance to get additional details
     echo "$instances" | jq -c '.[]' | while read instance; do
         db_identifier=$(echo $instance | jq -r '.[0]')
         size=$(echo $instance | jq -r '.[1]')
         engine=$(echo $instance | jq -r '.[2]')
-        allocated_storage=$(echo $instance | jq -r '.[3]')
-        endpoint=$(echo $instance | jq -r '.[4]')
-        db_security_groups=$(echo $instance | jq -r '.[5][]')
-        vpc_security_groups=$(echo $instance | jq -r '.[6][]')
-        status=$(echo $instance | jq -r '.[7]')
-        availability_zone=$(echo $instance | jq -r '.[8]')
-        storage_encrypted=$(echo $instance | jq -r '.[9]')
-        kms_key_arn=$(echo $instance | jq -r '.[10]')
-        db_instance_arn=$(echo $instance | jq -r '.[11]')
-        backup_retention_period=$(echo $instance | jq -r '.[12]')
+        engine_version=$(echo $instance | jq -r '.[3]')
+        allocated_storage=$(echo $instance | jq -r '.[4]')
+        endpoint=$(echo $instance | jq -r '.[5]')
+        db_security_groups=$(echo $instance | jq -r '.[6][]')
+        vpc_security_groups=$(echo $instance | jq -r '.[7][]')
+        status=$(echo $instance | jq -r '.[8]')
+        availability_zone=$(echo $instance | jq -r '.[9]')
+        storage_encrypted=$(echo $instance | jq -r '.[10]')
+        kms_key_arn=$(echo $instance | jq -r '.[11]')
+        db_instance_arn=$(echo $instance | jq -r '.[12]')
+        backup_retention_period=$(echo $instance | jq -r '.[13]')
+        
+        # Filter out DocumentDB instances
+        if [[ "$engine" == "docdb" || "$engine" == "docdb-elastic" ]]; then
+            continue
+        fi
         
         # Convert storage_encrypted to Yes or No
         if [ "$storage_encrypted" = "true" ]; then
@@ -55,8 +61,13 @@ for region in $regions; do
         # Get the role (whether it's part of a cluster or a standalone instance)
         if [ -n "$cluster_identifier" ]; then
             role="Cluster"
+            # Get reader and writer endpoints for the cluster
+            reader_endpoint=$(aws rds describe-db-clusters --db-cluster-identifier $cluster_identifier --region $region --query "DBClusters[0].ReaderEndpoint" --output text)
+            writer_endpoint=$(aws rds describe-db-clusters --db-cluster-identifier $cluster_identifier --region $region --query "DBClusters[0].Endpoint" --output text)
         else
             role="Standalone"
+            reader_endpoint=""
+            writer_endpoint=""
         fi
         
         # Extract CPUs and RAM from DB instance class
@@ -84,8 +95,9 @@ for region in $regions; do
         open_ports=$(echo $open_ports | tr ' ' '\n' | sort -n | uniq | tr '\n' ' ')
         
         # Append the instance details to the CSV file
-        echo "$account_id,$region,$db_identifier,$cluster_identifier,$role,$status,$engine,$size,$cpus,$ram,$allocated_storage,$endpoint,$availability_zone,$storage_encrypted,$kms_key_id,$is_automated_backup_enabled,\"$security_group_names\",\"$open_ports\"" >> rds_instances.csv
+        echo "$account_id,$region,$db_identifier,$cluster_identifier,$role,$status,$engine,$engine_version,$size,$cpus,$ram,$allocated_storage,$endpoint,$reader_endpoint,$writer_endpoint,$availability_zone,$storage_encrypted,$kms_key_id,$is_automated_backup_enabled,\"$security_group_names\",\"$open_ports\"" >> rds_instances.csv
     done
 done
 
 echo "Completed. Data saved in rds_instances.csv"
+
