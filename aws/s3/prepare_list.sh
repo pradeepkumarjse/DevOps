@@ -27,8 +27,8 @@ for bucket in $buckets; do
     owner=$(aws s3api get-bucket-acl --bucket $bucket --query 'Owner.DisplayName' --output text)
     
     # Get number of objects and total size in the bucket
-    number_of_objects=$(aws s3api list-objects --bucket $bucket --query 'length(Contents)' --output text 2>/dev/null)
-    total_size=$(aws s3api list-objects --bucket $bucket --query 'Contents[].Size' --output text | awk '{s+=$1} END {print s}')
+    number_of_objects=0 #$(aws s3api list-objects --bucket $bucket --query 'length(Contents)' --output text 2>/dev/null)
+    total_size=0 #$(aws s3api list-objects --bucket $bucket --query 'Contents[].Size' --output text | awk '{s+=$1} END {print s}')
     # Default to 0 if no objects
     number_of_objects=${number_of_objects:-0}
     total_size=${total_size:-0}
