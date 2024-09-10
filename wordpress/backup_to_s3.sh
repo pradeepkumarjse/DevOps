@@ -6,8 +6,6 @@ DB_USER="main_admin"
 DB_NAME="main_wordpress"
 DB_PASSWORD="Kishor@1234" 
 
-
-
 # Backup WordPress files
 zip -r $BACKUP_DIR/wordpress-files-backup-$TIMESTAMP.zip $WP_PATH
 
