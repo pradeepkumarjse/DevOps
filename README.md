@@ -1,12 +1,14 @@
 ```mermaid
 flowchart TB
-    subgraph AzureCloud["Azure"]
+    %% Azure cloud setup
+    subgraph AzureCloud["Azure Environment"]
         AzureRepos["Azure Repos"]
         AzurePipelines["Azure Pipeline"]
         ACR["Azure Container Registry (ACR)"]
         KeyVault["Azure Key Vault"]
     end
 
+    %% Virtual Network (VPC) structure
     subgraph VNet["Virtual Network (VPC)"]
         VPN["VPN Gateway"]
         
@@ -20,14 +22,15 @@ flowchart TB
         
         LoadBalancer["Load Balancer"]
         AppGateway["Azure App Gateway"]
-        PostgreSQL["PostgreSQL"]
+        PostgreSQL["PostgreSQL Database"]
     end
 
+    %% User access
     SoftwareDeveloper["Software Developer"]
     DevOpsAdmin["Gray Chain DevOps Admin"]
     Maintainer["Maintainer/Developer Access"]
 
-    %% Connections
+    %% Connections with labels
     SoftwareDeveloper -->|Developer Access| AzureRepos
     DevOpsAdmin -->|Cluster Admin Access| AzureRepos
     AzureRepos --> AzurePipelines
