@@ -1,9 +1,8 @@
-flowchart TD
+flowchart TB
     subgraph AzureCloud["Azure"]
-        direction TB
         AzureRepos["Azure Repos"]
         AzurePipelines["Azure Pipeline"]
-        ACR["Azure Container Registry"]
+        ACR["Azure Container Registry (ACR)"]
         KeyVault["Azure Key Vault"]
     end
 
@@ -24,7 +23,7 @@ flowchart TD
     end
 
     SoftwareDeveloper["Software Developer"]
-    DevOpsAdmin["Gray Chain DevOps"]
+    DevOpsAdmin["Gray Chain DevOps Admin"]
     Maintainer["Maintainer/Developer Access"]
 
     %% Connections
@@ -33,12 +32,10 @@ flowchart TD
     AzureRepos --> AzurePipelines
     AzurePipelines -->|Deploy| ACR
     AzurePipelines -->|Secrets| KeyVault
-    AzurePipelines -.->|Helm| VPN
+    AzurePipelines -.->|Helm Chart| VPN
     VPN --> VNet
     VNet --> LoadBalancer
     LoadBalancer --> AppGateway
     AppGateway -->|SSL| PostgreSQL
-    NodePool --> ProdNamespace
-    NodePool --> DevNamespace
     AKSCluster --> LoadBalancer
     PostgreSQL --> AKSCluster
