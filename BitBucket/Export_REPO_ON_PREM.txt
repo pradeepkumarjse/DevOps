@@ -1,0 +1,8 @@
+Create App Password
+
+curl -u "pradeep:ATLkZrXPGyxN0C3B4BB7"  --request GET  --url "https://api.bitbucket.org/2.0/repositories/surbhial"
+
+curl --fail --location -u "surbhial-admin:GyxN0C3B4BB7" "https://bitbucket.org/surbhial/create-react-app/get/main.zip" -OJ
+
+curl --fail --location -u "surbhial-admin:ATC3B4BB7" "https://bitbucket.org/surbhial/create-react-app/get/main.zip" -o code.zip
+
