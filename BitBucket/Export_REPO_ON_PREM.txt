@@ -6,3 +6,4 @@ curl --fail --location -u "surbhial-admin:GyxN0C3B4BB7" "https://bitbucket.org/s
 
 curl --fail --location -u "surbhial-admin:ATC3B4BB7" "https://bitbucket.org/surbhial/create-react-app/get/main.zip" -o code.zip
 
+powershell -ExecutionPolicy Bypass -File .\download_bitbucket_repos_zip.ps1
