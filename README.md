@@ -50,7 +50,7 @@ flowchart TB
 
 
 
-![System Architecture](devops-architecture.png "System Architecture Diagram")
+![System Architecture](devops-architecture.png)
 
 
 
