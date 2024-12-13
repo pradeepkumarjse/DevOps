@@ -1,3 +1,5 @@
+![System Architecture](devops-architecture.png)
+
 ```mermaid
 flowchart TB
     %% Azure cloud setup
@@ -43,15 +45,5 @@ flowchart TB
     AppGateway -->|SSL| PostgreSQL
     AKSCluster --> LoadBalancer
     PostgreSQL --> AKSCluster
-
-
-
-
-
-
-
-![System Architecture](devops-architecture.png)
-
-
 
 
