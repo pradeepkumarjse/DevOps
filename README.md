@@ -43,3 +43,15 @@ flowchart TB
     AppGateway -->|SSL| PostgreSQL
     AKSCluster --> LoadBalancer
     PostgreSQL --> AKSCluster
+
+
+
+
+
+
+
+![System Architecture](devops-architecture.png "System Architecture Diagram")
+
+
+
+
