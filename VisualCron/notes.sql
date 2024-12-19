@@ -1,4 +1,4 @@
-`select  
+select  
         bEmployeeMasterID,
         FirstName,
         LastName,
@@ -19,9 +19,9 @@
         IsPOSUser,
         SetupInKnowledgeBase,
         InternalEmployeeID       
-        from csv_data1;`
+        from csv_data1;
 
-`
+
 -- Step 1: Replace tabs with commas for field separation
 SET @DATA = REPLACE('{TASK(PrevTask|StdOut)}', '\t', ',');
 
@@ -63,10 +63,10 @@ SET @sql = CONCAT(
 SELECT @sql;
 PREPARE stmt FROM @sql;
 EXECUTE stmt;
-DEALLOCATE PREPARE stmt;`
+DEALLOCATE PREPARE stmt;
 
-`Job Name: {TRIGGER(Active|LastTrigger|VisualCron.Result.Job.Name)}
+Job Name: {TRIGGER(Active|LastTrigger|VisualCron.Result.Job.Name)}
 Message: {TRIGGER(Active|LastTrigger|VisualCron.Result.Message)}
-Timestamp: {TRIGGER(Active|LastTrigger|LastRun|MMM d, yyyy HH:mm tt)}`
+Timestamp: {TRIGGER(Active|LastTrigger|LastRun|MMM d, yyyy HH:mm tt)}
 
 
