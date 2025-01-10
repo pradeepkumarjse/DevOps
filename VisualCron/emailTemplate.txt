@@ -1,0 +1,11 @@
+Dear Team,
+
+This is to notify that a job has failed in the VisualCron system. Below are the details of the failed job: 
+
+Job Name: {TRIGGER(Active|LastTrigger|VisualCron.Result.Job.Name)}
+Message: {TRIGGER(Active|LastTrigger|VisualCron.Result.Message)}
+Timestamp: {TRIGGER(Active|LastTrigger|LastRun|MMM d, yyyy HH:mm tt)}
+
+Please take the necessary steps to investigate and resolve the issue promptly.  If you require any additional information, feel free to reach out.
+
+Best regards,
