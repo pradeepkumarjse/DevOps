@@ -25,12 +25,6 @@ const monthYear = formatMMYYYY(now)
 
 
 const payload = {
-    "target": 1048298,
-    "manpower": 18,
-    "avg_drops": "",
-    "strategy_type": "",
-    "avg_available_drivers": "",
-    "posted_price": 3.799,
     "date": monthYear,
     "date_from": currentDate,
     "date_to": currentDatePlus1
