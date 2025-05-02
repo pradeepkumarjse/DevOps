@@ -1,0 +1,1 @@
+mysql --local-infile=1 -u root -p company_data -e "LOAD DATA LOCAL INFILE 'C:\\Users\\prade\\Downloads\\employee.csv' INTO TABLE employees FIELDS TERMINATED BY ',' ENCLOSED BY '\"' LINES TERMINATED BY '\n' IGNORE 1 ROWS;"
