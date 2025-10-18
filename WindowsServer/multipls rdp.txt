@@ -1,0 +1,91 @@
+Got it — the message in your screenshot says:
+
+> “You are currently logged on as local administrator on the computer. You must be logged on as a domain user to manage servers and collections.”
+
+This means that **Remote Desktop Services (RDS)** is installed, but **you’re logged in locally**, and RDS is expecting a **domain environment** (Active Directory).
+
+Since you’re using a **standalone Windows Server 2019 (not joined to a domain)**, here’s the **fastest way** to make multiple RDP sessions work:
+
+---
+
+### 🧭 GOAL
+
+Allow **multiple simultaneous RDP connections** on a **standalone** Windows Server 2019 (no domain).
+
+---
+
+### ⚙️ FASTEST METHOD (without domain)
+
+You **don’t need full RDS deployment** — you just need to allow multiple sessions for Remote Desktop.
+
+#### Step 1: Enable Remote Desktop Licensing Mode via Group Policy
+
+1. Run → `gpedit.msc`
+2. Navigate to:
+
+   ```
+   Computer Configuration → Administrative Templates → Windows Components → Remote Desktop Services → Remote Desktop Session Host → Licensing
+   ```
+3. Enable:
+
+   * **“Set the Remote Desktop licensing mode”** → Set to **Per Device** or **Per User**
+   * **“Use the specified Remote Desktop license servers”** → Leave empty (optional for testing)
+
+#### Step 2: Allow multiple sessions per user
+
+1. Still in `gpedit.msc`, go to:
+
+   ```
+   Computer Configuration → Administrative Templates → Windows Components → Remote Desktop Services → Remote Desktop Session Host → Connections
+   ```
+2. Enable:
+
+   * **“Restrict Remote Desktop Services users to a single Remote Desktop Services session”** → **Disabled**
+
+#### Step 3: Allow RDP through firewall
+
+Run this in PowerShell (as Administrator):
+
+```powershell
+Enable-NetFirewallRule -DisplayGroup "Remote Desktop"
+```
+
+#### Step 4: Restart RDP service
+
+```powershell
+Restart-Service TermService -Force
+```
+
+#### Step 5: Connect using different local user accounts
+
+Create additional local users:
+
+```powershell
+net user user2 P@ssword123 /add
+```
+
+Then connect via RDP using:
+
+* `ServerIP\Administrator`
+* `ServerIP\user2`
+
+You should now have **multiple concurrent RDP sessions** active.
+
+---
+
+### ⚠️ NOTE
+
+If you installed **Remote Desktop Services (RDS roles)**, it will expect a **domain** setup (for Collections, Licensing, etc.).
+If you only need multiple RDP users — **you don’t need full RDS** — just use the method above.
+
+If you *already installed RDS roles*, remove them:
+
+```powershell
+Uninstall-WindowsFeature RDS-RD-Server,RDS-Connection-Broker,RDS-Web-Access
+```
+
+Then restart and reapply the settings above.
+
+---
+
+Would you like me to give you a **ready-to-run PowerShell script** that automatically applies all these settings?
